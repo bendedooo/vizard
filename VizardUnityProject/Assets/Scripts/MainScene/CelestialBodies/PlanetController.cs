@@ -17,6 +17,7 @@
 
  */
 using System.Collections.Generic;
+using System.IO;
 using TMPro;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -75,6 +76,7 @@ public class PlanetController : MonoBehaviour {
     private string materialKey;
     private Material atmosphereMaterial;
     private bool usingAtmosphereMaterial;
+    private Texture2D externalMoonAlbedoTexture;
 	
     public void InitializeCelestialBody(int index, string bodyPropertiesKey, bool isCustom, bool inTestMode=false){
         planetIndex = index;
@@ -678,6 +680,88 @@ public class PlanetController : MonoBehaviour {
                 }
             }
         }
+        ApplyExternalMoonAlbedo();
+    }
+
+    private void ApplyExternalMoonAlbedo()
+    {
+        if (bodyDictionaryKey != "moon")
+        {
+            return;
+        }
+
+        string texturePath =
+            System.Environment.GetEnvironmentVariable("VIZARD_MOON_TEXTURE");
+
+        if (string.IsNullOrWhiteSpace(texturePath))
+        {
+            return;
+        }
+
+        texturePath = texturePath.Trim();
+
+        if (!File.Exists(texturePath))
+        {
+            Debug.LogWarning(
+                $"External Moon albedo texture was not found: {texturePath}");
+            return;
+        }
+
+        try
+        {
+            byte[] imageData = File.ReadAllBytes(texturePath);
+
+            // linear=false creates an sRGB texture, matching the
+            // original Moon texture importer setting.
+            Texture2D texture = new Texture2D(
+                2,
+                2,
+                TextureFormat.RGBA32,
+                true,
+                false
+            );
+
+            if (!ImageConversion.LoadImage(texture, imageData, false))
+            {
+                Destroy(texture);
+                Debug.LogError(
+                    $"Could not decode external Moon albedo texture: {texturePath}");
+                return;
+            }
+
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Repeat;
+            texture.anisoLevel = 1;
+
+            texture.Apply(true, true);
+
+            MeshRenderer renderer =
+                planetModel.GetComponent<MeshRenderer>();
+
+            if (renderer == null)
+            {
+                Destroy(texture);
+                Debug.LogError(
+                    "Moon planet model does not have a MeshRenderer.");
+                return;
+            }
+
+            // .material gives this Moon its own material instance.
+            Material moonMaterial = renderer.material;
+
+            moonMaterial.SetTexture("_MainTex", texture);
+
+            externalMoonAlbedoTexture = texture;
+
+            Debug.Log(
+                $"External Moon albedo loaded: {texturePath}");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError(
+                $"Failed to load external Moon albedo: {ex}");
+        }
+
     }
 
     private void ApplyAtmosphereMaterial(Material newMaterial)
@@ -740,6 +824,12 @@ public class PlanetController : MonoBehaviour {
 
     private void OnDestroy()
     {
+        if (externalMoonAlbedoTexture != null)
+        {
+            Destroy(externalMoonAlbedoTexture);
+            externalMoonAlbedoTexture = null;
+        }
+
         if (matHandle.IsValid())
         {
             Addressables.Release(matHandle);
