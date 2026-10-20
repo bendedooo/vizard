@@ -223,7 +223,6 @@ MonoBehaviour:
   modelCenter: {x: 0, y: 0, z: 0}
   unitModelExtents: {x: 1, y: 1, z: 1}
   unitModelCenter: {x: 0, y: 0, z: 0}
-  unitModelExtentAverage: 1
   unitModelMaxExtent: 1
   recalcBounds: 0
   setUnitBounds: 0
@@ -376,7 +375,7 @@ Light:
   serializedVersion: 11
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 0.2
+  m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.802082
@@ -5334,11 +5333,6 @@ MonoBehaviour:
   msgIndex: 0
   solarSystemViewScaleFactor: 2
   sunRadius: 0
-  sunEllipticity: 0
-  sunDirectionalLightIntensityAtEarth: 1
-  attenuateLightWithDistanceFromSun: 0
-  sunIntensityFloor: 0.15
-  sunIntensityCeiling: 1
   sunMesh: {fileID: 1201782350149290}
   sunClickableCollider: {fileID: 1314704175270002}
   sunCoordinateAxes: {fileID: 1097216365463715583}

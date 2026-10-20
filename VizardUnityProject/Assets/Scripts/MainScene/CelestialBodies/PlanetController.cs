@@ -76,8 +76,28 @@ public class PlanetController : MonoBehaviour {
     private string materialKey;
     private Material atmosphereMaterial;
     private bool usingAtmosphereMaterial;
-    private Texture2D externalMoonAlbedoTexture;
-	
+   
+    // private Texture2D externalMoonAlbedoTexture;
+    // Time-varying Moon albedo experiment
+    private Texture2D normalMoonAlbedoTexture;
+    private Texture2D highMoonAlbedoTexture;
+    private Texture2D flashEmissionTexture;
+    private Material moonMaterial;
+    private bool highAlbedoActive = false;
+   
+
+    // Simulation-time interval in seconds
+    private const double HIGH_ALBEDO_START_TIME = 510.0;
+    private const double HIGH_ALBEDO_END_TIME = 580.0;
+    
+    // Lunar impact flash timing, in simulation seconds.
+    private const double FLASH_START_TIME = 520.0;
+    private const double FLASH_RISE_TIME = 0.10;
+    private const double FLASH_FADE_TIME = 0.90;
+
+    // Peak emission intensity multiplier.
+    private const float FLASH_PEAK_INTENSITY = 3.0f;
+    
     public void InitializeCelestialBody(int index, string bodyPropertiesKey, bool isCustom, bool inTestMode=false){
         planetIndex = index;
         VizMessage.Types.CelestialBody myMsg = MessageList.FirstMessage.CelestialBodies[planetIndex];
@@ -196,6 +216,12 @@ public class PlanetController : MonoBehaviour {
 
     public void UpdateCelestialBody()
     {
+        if (bodyDictionaryKey == "moon")
+        {
+        //UpdateTimeVaryingMoonAlbedo();
+        UpdateTimeVaryingMoonFlash();
+        }
+        
         double[] myPosition = {0, 0, 0};
         bool beyondSpriteThreshold = false;
         ratioProjectionToTrueDistanceFromCam = 1f;
@@ -690,30 +716,48 @@ public class PlanetController : MonoBehaviour {
             return;
         }
 
-        string texturePath =
-            System.Environment.GetEnvironmentVariable("VIZARD_MOON_TEXTURE");
+        string normalTexturePath =
+            "/Users/dedo/vizard-source/opnav_assets/moon_albedo_test/moon_original_preview.png";
+// "/Users/dedo/vizard-source/opnav_assets/moon_albedo_test/moon_albedo_runtime.png";
+        string highTexturePath =
+            "/Users/dedo/vizard-source/opnav_assets/moon_albedo_test/moon_albedo_high_runtime.png";
 
-        if (string.IsNullOrWhiteSpace(texturePath))
+        if (!File.Exists(normalTexturePath))
         {
+            Debug.LogWarning(
+                $"Normal Moon albedo texture was not found: {normalTexturePath}");
             return;
         }
 
-        texturePath = texturePath.Trim();
-
-        if (!File.Exists(texturePath))
+        if (!File.Exists(highTexturePath))
         {
             Debug.LogWarning(
-                $"External Moon albedo texture was not found: {texturePath}");
+                $"High Moon albedo texture was not found: {highTexturePath}");
             return;
         }
 
         try
         {
-            byte[] imageData = File.ReadAllBytes(texturePath);
+            MeshRenderer renderer =
+                planetModel.GetComponent<MeshRenderer>();
 
-            // linear=false creates an sRGB texture, matching the
-            // original Moon texture importer setting.
-            Texture2D texture = new Texture2D(
+            if (renderer == null)
+            {
+                Debug.LogError(
+                    "Moon planet model does not have a MeshRenderer.");
+                return;
+            }
+
+            // Give this Moon its own material instance.
+            moonMaterial = renderer.material;
+            
+            Debug.Log($"[MoonFlashDebug] Moon material shader: {moonMaterial.shader.name}");
+
+            // Load normal Moon texture.
+            byte[] normalImageData =
+                File.ReadAllBytes(normalTexturePath);
+
+            normalMoonAlbedoTexture = new Texture2D(
                 2,
                 2,
                 TextureFormat.RGBA32,
@@ -721,49 +765,243 @@ public class PlanetController : MonoBehaviour {
                 false
             );
 
-            if (!ImageConversion.LoadImage(texture, imageData, false))
+            if (!ImageConversion.LoadImage(
+                    normalMoonAlbedoTexture,
+                    normalImageData,
+                    false))
             {
-                Destroy(texture);
+                Destroy(normalMoonAlbedoTexture);
+                normalMoonAlbedoTexture = null;
+
                 Debug.LogError(
-                    $"Could not decode external Moon albedo texture: {texturePath}");
+                    $"Could not decode normal Moon albedo texture: {normalTexturePath}");
+
                 return;
             }
 
-            texture.filterMode = FilterMode.Bilinear;
-            texture.wrapMode = TextureWrapMode.Repeat;
-            texture.anisoLevel = 1;
+            // Load high-albedo Moon texture.
+            byte[] highImageData =
+                File.ReadAllBytes(highTexturePath);
 
-            texture.Apply(true, true);
+            highMoonAlbedoTexture = new Texture2D(
+                2,
+                2,
+                TextureFormat.RGBA32,
+                true,
+                false
+            );
 
-            MeshRenderer renderer =
-                planetModel.GetComponent<MeshRenderer>();
-
-            if (renderer == null)
+            if (!ImageConversion.LoadImage(
+                    highMoonAlbedoTexture,
+                    highImageData,
+                    false))
             {
-                Destroy(texture);
+                Destroy(highMoonAlbedoTexture);
+                highMoonAlbedoTexture = null;
+
                 Debug.LogError(
-                    "Moon planet model does not have a MeshRenderer.");
+                    $"Could not decode high Moon albedo texture: {highTexturePath}");
+
                 return;
             }
 
-            // .material gives this Moon its own material instance.
-            Material moonMaterial = renderer.material;
+            // Match the original Moon texture settings.
+            normalMoonAlbedoTexture.filterMode = FilterMode.Bilinear;
+            normalMoonAlbedoTexture.wrapMode = TextureWrapMode.Repeat;
+            normalMoonAlbedoTexture.anisoLevel = 1;
 
-            moonMaterial.SetTexture("_MainTex", texture);
+            highMoonAlbedoTexture.filterMode = FilterMode.Bilinear;
+            highMoonAlbedoTexture.wrapMode = TextureWrapMode.Repeat;
+            highMoonAlbedoTexture.anisoLevel = 1;
 
-            externalMoonAlbedoTexture = texture;
+            normalMoonAlbedoTexture.Apply(true, true);
+            highMoonAlbedoTexture.Apply(true, true);
+
+            // Start with the normal Moon.
+            moonMaterial.SetTexture(
+                "_MainTex",
+                normalMoonAlbedoTexture
+            );
+            // Create a localized emissive flash for the initial rendering test.
+            flashEmissionTexture = CreateStaticFlashEmissionTexture();
+
+            moonMaterial.SetTexture("_EmissionMap", flashEmissionTexture);
+            
+            moonMaterial.EnableKeyword("_EMISSION");
+            
+            // Start with the flash switched off.
+            // UpdateTimeVaryingMoonFlash() will control its brightness.
+            moonMaterial.SetColor("_EmissionColor", Color.black);
+
+
+            Debug.Log("[MoonFlashDebug] Static emissive spot installed at UV (0.50, 0.50).");
+
+            highAlbedoActive = false;
 
             Debug.Log(
-                $"External Moon albedo loaded: {texturePath}");
+                "Time-varying Moon albedo textures loaded successfully.");
+
+            Debug.Log(
+                $"Normal texture: {normalTexturePath}");
+
+            Debug.Log(
+                $"High-albedo texture: {highTexturePath}");
         }
         catch (System.Exception ex)
         {
             Debug.LogError(
-                $"Failed to load external Moon albedo: {ex}");
+                $"Failed to load time-varying Moon albedo textures: {ex}");
         }
+    }
+    private Texture2D CreateStaticFlashEmissionTexture()
+{
+    const int width = 1024;
+    const int height = 512;
 
+    // Initial test location in the Moon texture's UV coordinates.
+    const float centerU = 0.50f;
+    const float centerV = 0.50f;
+
+    // Gaussian width of the spot.
+    // These values are for rendering tests, not a physical impact model.
+    const float sigmaU = 0.0015f;
+    const float sigmaV = 0.0030f;
+
+    Texture2D texture = new Texture2D(
+        width,
+        height,
+        TextureFormat.RGBA32,
+        false,
+        true
+    );
+
+    texture.name = "ProceduralMoonFlashEmission";
+    texture.wrapMode = TextureWrapMode.Repeat;
+    texture.filterMode = FilterMode.Bilinear;
+    texture.anisoLevel = 1;
+
+    Color[] pixels = new Color[width * height];
+
+    for (int y = 0; y < height; y++)
+    {
+        float v = y / (float)(height - 1);
+        float dv = (v - centerV) / sigmaV;
+
+        for (int x = 0; x < width; x++)
+        {
+            float u = x / (float)(width - 1);
+
+            // Handle the horizontal UV wrap at the texture seam.
+            float rawDu = Mathf.Abs(u - centerU);
+            float du = Mathf.Min(rawDu, 1.0f - rawDu);
+
+            float normalizedDu = du / sigmaU;
+
+            // Radial Gaussian profile: brightest at the center,
+            // smoothly fading to black around it.
+            float distanceSquared =
+                normalizedDu * normalizedDu + dv * dv;
+
+            float intensity =
+                Mathf.Exp(-0.5f * distanceSquared);
+
+            pixels[y * width + x] = new Color(
+                intensity,
+                intensity,
+                intensity,
+                1.0f
+            );
+        }
     }
 
+    texture.SetPixels(pixels);
+
+    // Upload the texture to the GPU and release its CPU-side pixel data.
+    texture.Apply(false, true);
+
+    return texture;
+}
+    private void UpdateTimeVaryingMoonFlash()
+    {
+        if (moonMaterial == null || flashEmissionTexture == null)
+        {
+            return;
+        }
+
+        double simTimeSeconds =
+            MessageList.CurrentMessage.CurrentTime.SimTimeElapsed / 1e9;
+
+        double elapsed = simTimeSeconds - FLASH_START_TIME;
+
+        float intensity = 0.0f;
+
+        if (elapsed >= 0.0 && elapsed < FLASH_RISE_TIME)
+        {
+            // Linear rise from zero to peak brightness.
+            intensity = FLASH_PEAK_INTENSITY *
+                (float)(elapsed / FLASH_RISE_TIME);
+        }
+        else if (elapsed >= FLASH_RISE_TIME &&
+                 elapsed < FLASH_RISE_TIME + FLASH_FADE_TIME)
+        {
+            // Linear fade from peak brightness to zero.
+            double fadeElapsed = elapsed - FLASH_RISE_TIME;
+
+            intensity = FLASH_PEAK_INTENSITY *
+                (1.0f - (float)(fadeElapsed / FLASH_FADE_TIME));
+        }
+
+        moonMaterial.SetColor(
+            "_EmissionColor",
+            Color.white * Mathf.Max(0.0f, intensity)
+        );
+    }
+    private void UpdateTimeVaryingMoonAlbedo()
+    {
+        if (moonMaterial == null ||
+            normalMoonAlbedoTexture == null ||
+            highMoonAlbedoTexture == null)
+        {
+            return;
+        }
+
+        double simTimeSeconds =
+            MessageList.CurrentMessage.CurrentTime.SimTimeElapsed / 1e9;
+
+        bool shouldUseHighAlbedo =
+            simTimeSeconds >= HIGH_ALBEDO_START_TIME &&
+            simTimeSeconds < HIGH_ALBEDO_END_TIME;
+
+        if (shouldUseHighAlbedo == highAlbedoActive)
+        {
+            return;
+        }
+
+        if (shouldUseHighAlbedo)
+        {
+            moonMaterial.SetTexture(
+                "_MainTex",
+                highMoonAlbedoTexture
+            );
+
+            highAlbedoActive = true;
+
+            Debug.Log(
+                $"Moon high-albedo region ON at simulation time {simTimeSeconds:F2} s");
+        }
+        else
+        {
+            moonMaterial.SetTexture(
+                "_MainTex",
+                normalMoonAlbedoTexture
+            );
+
+            highAlbedoActive = false;
+
+            Debug.Log(
+                $"Moon high-albedo region OFF at simulation time {simTimeSeconds:F2} s");
+        }
+    }
     private void ApplyAtmosphereMaterial(Material newMaterial)
     {
         VizardGUISettings.PopRemoteAssetLoadFromList(materialKey, true);
@@ -824,11 +1062,23 @@ public class PlanetController : MonoBehaviour {
 
     private void OnDestroy()
     {
-        if (externalMoonAlbedoTexture != null)
+        if (normalMoonAlbedoTexture != null)
         {
-            Destroy(externalMoonAlbedoTexture);
-            externalMoonAlbedoTexture = null;
+            Destroy(normalMoonAlbedoTexture);
+            normalMoonAlbedoTexture = null;
         }
+
+        if (highMoonAlbedoTexture != null)
+        {
+            Destroy(highMoonAlbedoTexture);
+            highMoonAlbedoTexture = null;
+        }
+        if (flashEmissionTexture != null)
+        {
+            Destroy(flashEmissionTexture);
+            flashEmissionTexture = null;
+        }
+            moonMaterial = null;
 
         if (matHandle.IsValid())
         {
