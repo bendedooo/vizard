@@ -93,7 +93,7 @@ public class PlanetController : MonoBehaviour {
     // Lunar impact flash timing, in simulation seconds.
     private const double FLASH_START_TIME = 10.0;
     private const double FLASH_RISE_TIME = 0.01;
-    private const double FLASH_FADE_TIME = 0.09;
+    private const double FLASH_FADE_TIME = 0.19;
 
     // Peak emission intensity multiplier.
     private const float FLASH_PEAK_INTENSITY = 3.0f;
