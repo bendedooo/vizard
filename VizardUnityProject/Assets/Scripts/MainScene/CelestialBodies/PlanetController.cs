@@ -91,9 +91,9 @@ public class PlanetController : MonoBehaviour {
     private const double HIGH_ALBEDO_END_TIME = 580.0;
     
     // Lunar impact flash timing, in simulation seconds.
-    private const double FLASH_START_TIME = 520.0;
-    private const double FLASH_RISE_TIME = 0.10;
-    private const double FLASH_FADE_TIME = 0.90;
+    private const double FLASH_START_TIME = 10.0;
+    private const double FLASH_RISE_TIME = 0.01;
+    private const double FLASH_FADE_TIME = 0.09;
 
     // Peak emission intensity multiplier.
     private const float FLASH_PEAK_INTENSITY = 3.0f;
@@ -859,8 +859,8 @@ public class PlanetController : MonoBehaviour {
     const int height = 512;
 
     // Initial test location in the Moon texture's UV coordinates.
-    const float centerU = 0.50f;
-    const float centerV = 0.50f;
+    const float centerU = 0.90f;
+    const float centerV = 0.80f;
 
     // Gaussian width of the spot.
     // These values are for rendering tests, not a physical impact model.
