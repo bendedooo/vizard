@@ -91,7 +91,7 @@ public class PlanetController : MonoBehaviour {
     private const double HIGH_ALBEDO_END_TIME = 580.0;
     
     // Lunar impact flash timing, in simulation seconds.
-    private const double FLASH_START_TIME = 10.0;
+    private const double FLASH_START_TIME = 240.0;
     private const double FLASH_RISE_TIME = 0.01;
     private const double FLASH_FADE_TIME = 0.19;
 
