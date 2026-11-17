@@ -717,10 +717,10 @@ public class PlanetController : MonoBehaviour {
         }
 
         string normalTexturePath =
-            "/Users/dedo/vizard-source/opnav_assets/moon_albedo_test/moon_original_preview.png";
-// "/Users/dedo/vizard-source/opnav_assets/moon_albedo_test/moon_albedo_runtime.png";
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile) + "/Projects/vizard/opnav_assets/moon_albedo_test/moon_original_preview.png";
+// System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile) + "/Projects/vizard/opnav_assets/moon_albedo_test/moon_albedo_runtime.png";
         string highTexturePath =
-            "/Users/dedo/vizard-source/opnav_assets/moon_albedo_test/moon_albedo_high_runtime.png";
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile) + "/Projects/vizard/opnav_assets/moon_albedo_test/moon_albedo_high_runtime.png";
 
         if (!File.Exists(normalTexturePath))
         {
