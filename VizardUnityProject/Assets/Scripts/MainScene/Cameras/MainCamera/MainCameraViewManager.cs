@@ -69,6 +69,8 @@ public class MainCameraViewManager : MonoBehaviour
     {
         if (firstUpdate)
         {
+            // Spacecraft not created yet: skip and try again next FixedUpdate
+            if (MainCameraUtilities.CameraTarget == null) return;
             //Calculate the current local planet view scale 
             CelestialBodyStateUtilities.CalculateLocalPlanetViewScale(MainCameraUtilities.CameraTarget);
             firstUpdate = false;

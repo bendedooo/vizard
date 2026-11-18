@@ -130,6 +130,14 @@ public class GroundTrackOsculating : MonoBehaviour
 
     private bool CheckParentBodyRotates()
     {
+	    // Live sim: the scene can be built before Basilisk's 2nd message arrives.
+	    // Without this guard the NullReferenceException aborts scene setup, so the
+	    // instrument cameras are never created and Basilisk waits forever for an image.
+	    if (MessageList.GetMessageAtIndex(1) == null ||
+	        MessageList.GetMessageAtIndex(MessageList.LastMessageIndexOfPlottedMessages) == null)
+	    {
+		    return true;
+	    }
 	    //Spot check some rotations
 	    double[] firstMessageRotation = MessageList.FirstMessage.CelestialBodies[parentBodyIndex].Rotation.ToArray();
 	    double[] secondMessageRotation = MessageList.GetMessageAtIndex(1).CelestialBodies[parentBodyIndex].Rotation.ToArray();
